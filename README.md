@@ -1,8 +1,12 @@
-# Universe Datascraper Block Consumer
+# Universe Datascraper Monitor Consumer
 
 ## Description
 
 This consumer is to fetch NFT contract addresses by a given block number from block producer. It scans all contract addresses in the block that are compatible with ERC721 or ERC1155 token. Then the contract addresses as new collections are stored in database for the next processing step.
+
+It then analyze all possible tokens and transfers based on the collections retrieved from above.
+
+Also it will analyze owners for both 721 and 1155. For 1155 it will generate a owner task for the owner flow to handle and for 721 it just directly write to owner database.
 
 ## Requirements:
 
