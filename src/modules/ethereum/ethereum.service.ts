@@ -1,0 +1,102 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { EthereumNetworkType } from './interface';
+import { ethers } from 'ethers';
+import { ConfigService } from '@nestjs/config';
+
+const ERC165ABI = [
+  {
+    constant: true,
+    inputs: [{ internalType: 'bytes4', name: '', type: 'bytes4' }],
+    name: 'supportsInterface',
+    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
+    payable: false,
+    stateMutability: 'view',
+    type: 'function',
+  },
+];
+
+@Injectable()
+export class EthereumService {
+  public ether: ethers.providers.BaseProvider;
+  private readonly logger = new Logger(EthereumService.name);
+
+  constructor(private configService: ConfigService) {
+    const key = this.configService.get('ethereum_network');
+
+    const projectSecret = this.configService.get('infura.project_secret');
+    const projectId = this.configService.get('infura.project_id');
+
+    if (!projectSecret || !projectId) {
+      this.logger.log('Infura project id or secret is not defined');
+      throw new Error('Infura project id or secret is not defined');
+    }
+
+    const ethersProvider = ethers.getDefaultProvider(EthereumNetworkType[key], {
+      infura: {
+        projectId,
+      },
+    });
+    this.ether = ethersProvider;
+  }
+
+  async getContractsInBlock(allAddress: string[]) {
+    const provider = this.ether;
+    const uniqueAddress = [...new Set(allAddress)];
+    const resultPromises = uniqueAddress.map(async (address) => {
+      if (address === '0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB') {
+        return { contractAddress: address, tokenType: 'CryptoPunks' };
+      }
+      try {
+        const contract = new ethers.Contract(address, ERC165ABI, provider);
+        const type = await getERCtype(contract);
+        return { contractAddress: address, tokenType: type };
+      } catch (error) {
+        return { contractAddress: address, tokenType: undefined };
+      }
+    });
+    const result = await Promise.all(resultPromises);
+    return result.filter((r) => r.tokenType !== undefined);
+  }
+
+  async getLogsInBlock(blockNum: number) {
+    // const ERC721Transfer = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+    // const CryptoPunksPunkTransfer = "0x05af636b70da6819000c49f85b21fa82081c632069bb626f30932034099107d8";
+    // const CryptoPunksPunkBought= "0x58e5d5a525e3b40bc15abaa38b5882678db1ee68befd2f60bafe3a7fd06db9e3";
+    // const ERC1155TransferSingle = "0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62";
+    // const ERC1155TransferBatch = "0x4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb";
+    const topics = [
+      [
+        '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',
+        '0x05af636b70da6819000c49f85b21fa82081c632069bb626f30932034099107d8',
+        '0x58e5d5a525e3b40bc15abaa38b5882678db1ee68befd2f60bafe3a7fd06db9e3',
+        '0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62',
+        '0x4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb',
+      ],
+    ];
+    const filter = {
+      fromBlock: blockNum,
+      toBlock: blockNum,
+      topics: topics,
+    };
+    this.logger.log('start processing block: ' + blockNum);
+    const result = await this.ether.getLogs(filter);
+    this.logger.log('end processing block: ' + blockNum);
+    return result;
+  }
+}
+
+async function getERCtype(contract: any) {
+  try {
+    const is721 = await contract.supportsInterface('0x80ac58cd');
+    if (is721) {
+      return 'ERC721';
+    }
+    const is1155 = await contract.supportsInterface('0xd9b67a26');
+    if (is1155) {
+      return 'ERC1155';
+    }
+  } catch (error) {
+    return undefined;
+  }
+  return undefined;
+}
