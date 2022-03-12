@@ -1,5 +1,5 @@
 {
-  "name": "universe-datascraper-transfer-consumer",
+  "name": "universe-datascraper-monitor-consumer",
   "version": "1.0.0",
   "description": "",
   "author": "",
@@ -48,7 +48,8 @@
     "sqs-consumer": "^5.6.0",
     "sqs-producer": "^2.1.0",
     "swagger-ui-express": "^4.3.0",
-    "ts-singleton": "^1.0.2"
+    "ts-singleton": "^1.0.2",
+    "webpack": "^5.70.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^8.2.0",
