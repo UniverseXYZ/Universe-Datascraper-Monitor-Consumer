@@ -179,9 +179,9 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       this.groupTransferHistoryByTokenId(transferHistories);
 
     const latestTransferHistory = Object.keys(groupedTransferHistories).map(
-      (tokenId) => {
+      (key) => {
         // sort descending
-        const historiesWithTokenId = groupedTransferHistories[tokenId].sort(
+        const historiesWithTokenId = groupedTransferHistories[key].sort(
           (a, b) => b.blockNum - a.blockNum,
         );
 
@@ -193,7 +193,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
 
   private groupTransferHistoryByTokenId(transferHistories: TransferHistory[]) {
     const groupByTokenId = R.groupBy((history: TransferHistory) => {
-      return history.tokenId;
+      return `${history.contractAddress}:${history.tokenId}`;
     });
 
     const grouped = groupByTokenId(transferHistories);
