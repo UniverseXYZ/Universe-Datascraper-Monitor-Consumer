@@ -12,6 +12,7 @@ import {
   ReceivedMessage,
   TIMEOUT_EVENT_NAME,
   MESSAGE_PROCESSED_EVENT_NAME,
+  EmptyLogError,
 } from './sqs-consumer.types';
 import { ConfigService } from '@nestjs/config';
 import { EthereumService } from '../ethereum/ethereum.service';
@@ -27,7 +28,6 @@ import { NFTBlockMonitorTaskService } from '../nft-block-monitor-task/nft-block-
 import { MessageStatus, NFTTokenOwner } from 'datascraper-schema';
 import { DalNFTTokenOwnerService } from '../Dal/dal-nft-token-owner/dal-nft-token-owner.service';
 import { TransferHistory } from '../ethereum/ethereum.types';
-import { getContractAddress } from 'ethers/lib/utils';
 
 const abiCoder = new ethers.utils.AbiCoder();
 const decodeAddress = (data: string) => {
@@ -70,11 +70,11 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
   public onModuleInit() {
     this.logger.log('onModuleInit');
     this.queue = new AWS.SQS({
-      // httpOptions: {
-      //   agent: new https.Agent({
-      //     keepAlive: true,
-      //   }),
-      // },
+      httpOptions: {
+        agent: new https.Agent({
+          keepAlive: true,
+        }),
+      },
     });
     this.sqsConsumer = Consumer.create({
       queueUrl: this.configService.get('aws.queueUrl'),
@@ -232,6 +232,12 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(
       `${logInBlock.length} logs found in this block may contain NFT transfers`,
     );
+
+    if (logInBlock.length === 0) {
+      this.logger.log(`No logs found in this block`);
+      throw new EmptyLogError('No logs found in this block');
+    }
+
     const addresses = logInBlock.map((x) => x.address);
     const allAddress = await this.etherService.getContractsInBlock(addresses);
     const cryptopunkBatch = [];
@@ -431,19 +437,19 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     await this.nftTokenOwnersTaskService.upsertTasks(toBeInsertedTasks);
   }
 
-  onError(error: Error, message: AWS.SQS.Message) {
+  async onError(error: Error, message: AWS.SQS.Message) {
     this.logger.log(`SQS error ${error.message}`);
-    this.handleError(error, message, 'SQS');
+    await this.handleError(error, message, 'SQS');
   }
 
-  onProcessingError(error: Error, message: AWS.SQS.Message) {
+  async onProcessingError(error: Error, message: AWS.SQS.Message) {
     this.logger.log(`Processing error ${error.message}`);
-    this.handleError(error, message, 'Processing');
+    await this.handleError(error, message, 'Processing');
   }
 
-  onTimeoutError(error: Error, message: AWS.SQS.Message) {
+  async onTimeoutError(error: Error, message: AWS.SQS.Message) {
     this.logger.log(`Timeout error ${error.message}`);
-    this.handleError(error, message, 'Timeout');
+    await this.handleError(error, message, 'Timeout');
   }
 
   onMessageProcessed(message: AWS.SQS.Message) {
@@ -453,7 +459,11 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`Messages ${message?.MessageId} have been processed`);
   }
 
-  private handleError(error: Error, message: AWS.SQS.Message, type: string) {
+  private async handleError(
+    error: Error,
+    message: AWS.SQS.Message,
+    type: string,
+  ) {
     const receivedMessage = JSON.parse(message.Body) as ReceivedMessage;
 
     const nftBlockTask = {
@@ -461,13 +471,23 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       blockNum: receivedMessage.blockNum,
     };
 
-    this.nftBlockMonitorTaskService.updateNFTBlockMonitorTask({
+    let status = MessageStatus.error;
+    let errorMessage =
+      `Error type: [${type}] - ${error.stack || error.message}` ||
+      `Error type: [${type}] - ${JSON.stringify(error)}`;
+
+    // its possible for the block don't have any tx yet and we need persist it in this case and do manual check later
+    if (error instanceof EmptyLogError) {
+      status = MessageStatus.empty;
+      errorMessage = null; // no need of error message in this case
+    }
+
+    await this.nftBlockMonitorTaskService.updateNFTBlockMonitorTask({
       ...nftBlockTask,
-      status: MessageStatus.error,
-      errorMessage:
-        `Error type: [${type}] - ${error.stack || error.message}` ||
-        `Error type: [${type}] - ${JSON.stringify(error)}`,
+      status,
+      errorMessage,
     });
+
     this.deleteMessage(message);
   }
 
