@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EthereumNetworkType } from './interface';
 import { ethers } from 'ethers';
 import { ConfigService } from '@nestjs/config';
+import R from 'ramda';
 
 const ERC165ABI = [
   {
@@ -40,22 +41,33 @@ export class EthereumService {
   }
 
   async getContractsInBlock(allAddress: string[]) {
+    const currentTimestamp = new Date().getTime() / 1000;
+    this.logger.log('start analyzing contracts timestamp: ' + currentTimestamp);
     const provider = this.ether;
-    const uniqueAddress = [...new Set(allAddress)];
-    const resultPromises = uniqueAddress.map(async (address) => {
+    const uniqueAddress = R.uniq(allAddress);
+    this.logger.log(
+      'analyzing unique contract address: ' + uniqueAddress.length,
+    );
+    let result = {};
+    for (const address of uniqueAddress) {
       if (address === '0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB') {
-        return { contractAddress: address, tokenType: 'CryptoPunks' };
+        result[address] = 'CryptoPunks';
+        continue;
       }
       try {
         const contract = new ethers.Contract(address, ERC165ABI, provider);
         const type = await getERCtype(contract);
-        return { contractAddress: address, tokenType: type };
+        if (type) {
+          result[address] = type;
+        }
+        continue;
       } catch (error) {
-        return { contractAddress: address, tokenType: undefined };
+        continue;
       }
-    });
-    const result = await Promise.all(resultPromises);
-    return result.filter((r) => r.tokenType !== undefined);
+    }
+    const endTimestamp = new Date().getTime() / 1000;
+    this.logger.log('start analyzing contracts timestamp: ' + endTimestamp);
+    return result;
   }
 
   async getLogsInBlock(blockNum: number) {

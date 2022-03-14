@@ -27,6 +27,7 @@ import { NFTBlockMonitorTaskService } from '../nft-block-monitor-task/nft-block-
 import { MessageStatus, NFTTokenOwner } from 'datascraper-schema';
 import { DalNFTTokenOwnerService } from '../Dal/dal-nft-token-owner/dal-nft-token-owner.service';
 import { TransferHistory } from '../ethereum/ethereum.types';
+import { getContractAddress } from 'ethers/lib/utils';
 
 const abiCoder = new ethers.utils.AbiCoder();
 const decodeAddress = (data: string) => {
@@ -69,11 +70,11 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
   public onModuleInit() {
     this.logger.log('onModuleInit');
     this.queue = new AWS.SQS({
-      httpOptions: {
-        agent: new https.Agent({
-          keepAlive: true,
-        }),
-      },
+      // httpOptions: {
+      //   agent: new https.Agent({
+      //     keepAlive: true,
+      //   }),
+      // },
     });
     this.sqsConsumer = Consumer.create({
       queueUrl: this.configService.get('aws.queueUrl'),
@@ -228,7 +229,11 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     const logInBlock = await this.etherService.getLogsInBlock(
       nftBlockTask.blockNum,
     );
-    const allAddress = [];
+    this.logger.log(
+      `${logInBlock.length} logs found in this block may contain NFT transfers`,
+    );
+    const addresses = logInBlock.map((x) => x.address);
+    const allAddress = await this.etherService.getContractsInBlock(addresses);
     const cryptopunkBatch = [];
     const erc721Batch = [];
     const erc1155Batch = [];
@@ -242,6 +247,9 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
         x;
       switch (topics[0]) {
         case CryptoPunksPunkTransfer:
+          if (R.prop(address)(allAddress) != 'CryptoPunks') {
+            break;
+          }
           const punkIndex = ethers.BigNumber.from(data).toString();
           cryptopunkBatch.push({
             contractAddress: address,
@@ -257,10 +265,6 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
             },
             category: 'CryptoPunks',
           });
-          allAddress.push({
-            contractAddress: address,
-            tokenType: 'CryptoPunks',
-          });
           tokens.push({
             contractAddress: address,
             tokenType: 'CryptoPunks',
@@ -269,6 +273,9 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
           });
           break;
         case CryptoPunksPunkBought:
+          if (R.prop(address)(allAddress) != 'CryptoPunks') {
+            break;
+          }
           const _punkIndex = ethers.BigNumber.from(topics[1]).toString();
           cryptopunkBatch.push({
             contractAddress: address,
@@ -284,10 +291,6 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
             },
             category: 'CryptoPunks',
           });
-          allAddress.push({
-            contractAddress: address,
-            tokenType: 'CryptoPunks',
-          });
           tokens.push({
             contractAddress: address,
             tokenType: 'CryptoPunks',
@@ -298,6 +301,9 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
         case ERC721Transfer:
           // erc20 and erc721 topic is the same, thus we can differentiate them by checking the length of topics
           if (topics.length < 4) {
+            break;
+          }
+          if (R.prop(address)(allAddress) != 'ERC721') {
             break;
           }
           const erc721TokenId = ethers.BigNumber.from(topics[3]).toString();
@@ -311,10 +317,6 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
             tokenId: erc721TokenId,
             category: 'ERC721',
           });
-          allAddress.push({
-            contractAddress: address,
-            tokenType: 'ERC721',
-          });
           tokens.push({
             contractAddress: address,
             tokenType: 'ERC721',
@@ -323,6 +325,9 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
           });
           break;
         case ERC1155TransferSingle:
+          if (R.prop(address)(allAddress) != 'ERC1155') {
+            break;
+          }
           const [_id, _value] = abiCoder.decode(['uint256', 'uint256'], data);
           erc1155Batch.push({
             contractAddress: address,
@@ -337,10 +342,6 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
               value: ethers.BigNumber.from(_value).toString(),
             },
             category: 'ERC1155',
-          });
-          allAddress.push({
-            contractAddress: address,
-            tokenType: 'ERC1155',
           });
           tokens.push({
             contractAddress: address,
@@ -358,6 +359,9 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
           });
           break;
         case ERC1155TransferBatch:
+          if (R.prop(address)(allAddress) != 'ERC1155') {
+            break;
+          }
           const [tokenIds, values] = abiCoder.decode(
             ['uint256[]', 'uint256[]'],
             data,
@@ -392,10 +396,6 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
               taskId: uuidv4(),
             });
           });
-          allAddress.push({
-            contractAddress: address,
-            tokenType: 'ERC1155',
-          });
           break;
         default:
           break;
@@ -413,7 +413,15 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     await this.dalNFTTransferHistoryService.createERC1155NFTTransferHistoryBatch(
       erc1155Batch,
     );
-    const toBeInserted = R.uniqBy(R.prop('contractAddress'), allAddress);
+    const allAddressKeys = R.keys(allAddress);
+    const allAddressTypes = R.values(allAddress);
+    const toBeInserted = R.zipWith(
+      (a, b) => {
+        return { contractAddress: a, tokenType: b };
+      },
+      allAddressKeys,
+      allAddressTypes,
+    );
     await this.nftCollectionService.insertIfNotThere(toBeInserted);
     await this.dalNFTTokensService.upsertTokens(tokens);
     const toBeInsertedTasks = R.uniqBy(
