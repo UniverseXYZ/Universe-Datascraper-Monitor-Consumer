@@ -41,7 +41,6 @@ export class NFTBlockMonitorTaskService {
   async updateNFTBlockMonitorTask(
     task: CreateNFTBlockMonitorTaskDto,
   ): Promise<void> {
-    this.logger.log(`update task ${task.messageId} status (${task.status})`);
     await this.nftBlockMonitorTaskModel.updateOne(
       { messageId: task.messageId },
       { $set: { ...task } },
@@ -50,7 +49,6 @@ export class NFTBlockMonitorTaskService {
   }
 
   async removeNFTBlockMonitorTask(messageId: string) {
-    this.logger.log(`remove task ${messageId}`);
     await this.nftBlockMonitorTaskModel.deleteOne({
       messageId,
     });

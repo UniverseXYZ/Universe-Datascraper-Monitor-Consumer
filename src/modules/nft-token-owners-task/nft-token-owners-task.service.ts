@@ -28,9 +28,6 @@ export class NFTTokenOwnersTaskService {
   }
 
   async setTaskInProcessing(contractAddress: string, tokenId: string) {
-    this.logger.log(
-      `Set task contract: ${contractAddress} - tokenId: ${tokenId} in processing`,
-    );
     await this.nftTokenOwnersTaskModel.findOneAndUpdate(
       { contractAddress, tokenId },
       { isProcessing: true, sentAt: new Date() },
@@ -38,8 +35,6 @@ export class NFTTokenOwnersTaskService {
   }
 
   async upsertTasks(tasks: CreateOwnerTaskDto[]): Promise<void> {
-    this.logger.log(`Bulk write ${tasks.length} owner tasks`);
-
     await this.nftTokenOwnersTaskModel.insertMany(
       tasks.map((x) => ({
         contractAddress: x.contractAddress,

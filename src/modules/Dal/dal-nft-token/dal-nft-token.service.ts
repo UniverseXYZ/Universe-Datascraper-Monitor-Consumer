@@ -13,7 +13,6 @@ export class DalNFTTokensService {
   ) {}
 
   async upsertTokens(tokens: CreateNFTTokenDto[]): Promise<void> {
-    this.logger.log(`Bulk write ${tokens.length} tokens`);
     await this.nfttokensModel.bulkWrite(
       tokens.map((x) => {
         const { contractAddress, tokenId, ...rest } = x;
@@ -31,7 +30,6 @@ export class DalNFTTokensService {
 
   //ERC721 is non fungible token which only has one tokenId
   async upsertERC721NFTTokens(tokens: CreateNFTTokenDto[]): Promise<void> {
-    this.logger.log(`Bulk write ${tokens.length} ERC721 tokens`);
     await this.nfttokensModel.bulkWrite(
       tokens.map((x) => ({
         updateOne: {
@@ -52,7 +50,6 @@ export class DalNFTTokensService {
 
   //CryptoPunks is non fungible token which only has one tokenId
   async upsertCryptoPunksNFTTokens(tokens: CreateNFTTokenDto[]): Promise<void> {
-    this.logger.log(`Bulk write ${tokens.length} CryptoPunks tokens`);
     await this.nfttokensModel.bulkWrite(
       tokens.map((x) => {
         const { contractAddress, tokenId, ...rest } = x;
@@ -87,14 +84,12 @@ export class DalNFTTokensService {
   }
 
   async insertTokens(toBeInsertedTokens: CreateNFTTokenDto[]) {
-    this.logger.log(`Inserting ${toBeInsertedTokens.length} ERC1155 tokens`);
     await this.nfttokensModel.insertMany(toBeInsertedTokens, {
       ordered: false,
     });
   }
 
   async updateTokens(toBeUpdatedTokens: CreateNFTTokenDto[]) {
-    this.logger.log(`Updating ${toBeUpdatedTokens.length} ERC1155 tokens`);
     await this.nfttokensModel.bulkWrite(
       toBeUpdatedTokens.map((x) => ({
         updateOne: {

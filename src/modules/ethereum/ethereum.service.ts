@@ -40,15 +40,12 @@ export class EthereumService {
     this.ether = ethersProvider;
   }
 
-  async getContractsInBlock(allAddress: string[]) {
+  async getContractsInBlock(allAddress: string[], blockNum: number) {
     const currentTimestamp = new Date().getTime() / 1000;
-    this.logger.log('start analyzing contracts timestamp: ' + currentTimestamp);
     const provider = this.ether;
     const uniqueAddress = R.uniq(allAddress);
-    this.logger.log(
-      'analyzing unique contract address: ' + uniqueAddress.length,
-    );
     const result = {};
+    let processedNum = 0;
     for (const address of uniqueAddress) {
       if (address === '0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB') {
         result[address] = 'CryptoPunks';
@@ -57,6 +54,7 @@ export class EthereumService {
       try {
         const contract = new ethers.Contract(address, ERC165ABI, provider);
         const type = await getERCtype(contract);
+        processedNum++;
         if (type) {
           result[address] = type;
         }
@@ -66,7 +64,11 @@ export class EthereumService {
       }
     }
     const endTimestamp = new Date().getTime() / 1000;
-    this.logger.log('start analyzing contracts timestamp: ' + endTimestamp);
+    this.logger.log(
+      `[${blockNum}] total processing time spent for abi verified ${processedNum}/${
+        uniqueAddress.length
+      } collections with ${endTimestamp - currentTimestamp} seconds`,
+    );
     return result;
   }
 
@@ -90,9 +92,7 @@ export class EthereumService {
       toBlock: blockNum,
       topics: topics,
     };
-    this.logger.log('start processing block: ' + blockNum);
     const result = await this.ether.getLogs(filter);
-    this.logger.log('end processing block: ' + blockNum);
     return result;
   }
 }

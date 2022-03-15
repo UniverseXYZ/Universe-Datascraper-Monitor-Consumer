@@ -39,6 +39,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SqsConsumerService.name);
   public sqsConsumer: Consumer;
   public queue: AWS.SQS;
+  private processingBlockNum: number;
 
   constructor(
     private readonly configService: ConfigService,
@@ -110,10 +111,10 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
   async handleOwners(transferHistories: TransferHistory[]) {
     if (transferHistories.length === 0) return;
 
-    this.logger.log('Start handling token owners');
-
+    this.logger.log(`[${this.processingBlockNum}] getting latest history`);
     const latestHistory = this.getLatestHistory(transferHistories);
 
+    this.logger.log(`[${this.processingBlockNum}] getting ERC721 token owners`);
     const owners = await this.nftTokenOwnerService.getERC721NFTTokenOwners(
       latestHistory.map((x) => ({
         contractAddress: x.contractAddress,
@@ -126,10 +127,16 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       owners,
     );
 
-    await this.nftTokenOwnerService.createERC721NFTTokenOwners(
+    this.logger.log(
+      `[${this.processingBlockNum}] updating token owners, ${toBeInsertedOwners.length} owners`,
+    );
+    await this.nftTokenOwnerService.upsertERC721NFTTokenOwners(
       toBeInsertedOwners,
     );
 
+    this.logger.log(
+      `[${this.processingBlockNum}] upserting token owners, ${toBeUpdatedOwners.length} owners`,
+    );
     await this.nftTokenOwnerService.updateERC721NFTTokenOwners(
       toBeUpdatedOwners,
     );
@@ -204,6 +211,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
 
   async handleMessage(message: AWS.SQS.Message) {
     this.logger.log(`Consumer handle message id:(${message.MessageId})`);
+    const currentTimestamp = new Date().getTime() / 1000;
     const receivedMessage = JSON.parse(message.Body) as ReceivedMessage;
 
     const nftBlockTask = {
@@ -211,7 +219,11 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       blockNum: receivedMessage.blockNum,
     };
 
-    this.logger.log(`Set message id:(${message.MessageId}) as processing`);
+    this.processingBlockNum = receivedMessage.blockNum;
+
+    this.logger.log(
+      `[${this.processingBlockNum}] setting message id:(${message.MessageId}) as processing`,
+    );
     await this.nftBlockMonitorTaskService.updateNFTBlockMonitorTask({
       ...nftBlockTask,
       status: MessageStatus.processing,
@@ -228,28 +240,36 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       '0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62';
     const ERC1155TransferBatch =
       '0x4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb';
+
+    this.logger.log(`[${this.processingBlockNum}] getting logs in block`);
     const logInBlock = await this.etherService.getLogsInBlock(
       nftBlockTask.blockNum,
     );
     this.logger.log(
-      `${logInBlock.length} logs found in this block may contain NFT transfers`,
+      `[${this.processingBlockNum}] found ${logInBlock.length} logs in this block may contain NFT transfers`,
     );
 
     if (logInBlock.length === 0) {
-      this.logger.log(`No logs found in this block`);
+      this.logger.log(
+        `[${this.processingBlockNum}] no logs found in this block`,
+      );
       throw new EmptyLogError('No logs found in this block');
     }
 
     const addresses = logInBlock.map((x) => x.address);
-    const allAddress = await this.etherService.getContractsInBlock(addresses);
+    this.logger.log(
+      `[${this.processingBlockNum}] retrieving contracts from block`,
+    );
+    const allAddress = await this.etherService.getContractsInBlock(
+      addresses,
+      receivedMessage.blockNum,
+    );
     const cryptopunkBatch = [];
     const erc721Batch = [];
     const erc1155Batch = [];
     const tokens = [];
     const ownerTasks = [];
-    this.logger.log(
-      `Start handling ${logInBlock.length} logs in block: ${nftBlockTask.blockNum}`,
-    );
+
     for (const x of logInBlock) {
       const { address, data, topics, blockNumber, transactionHash, logIndex } =
         x;
@@ -437,18 +457,32 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      this.logger.log('end handling logs in block: ' + nftBlockTask.blockNum);
+      // ERC721
+      this.logger.log(
+        `[${this.processingBlockNum}] Bulk Writting ERC721 transfers: ${erc721Batch.length} histories`,
+      );
       await this.dalNFTTransferHistoryService.createERC721NFTTransferHistoryBatch(
         erc721Batch,
       );
       await this.handleOwners(erc721Batch);
+
+      // CryptoPunks
+      this.logger.log(
+        `[${this.processingBlockNum}] Bulk Writting CryptoPunks transfers: ${cryptopunkBatch.length} histories`,
+      );
       await this.dalNFTTransferHistoryService.createCryptoPunksNFTTransferHistoryBatch(
         cryptopunkBatch,
       );
       await this.handleOwners(cryptopunkBatch);
+
+      // ERC1155
+      this.logger.log(
+        `[${this.processingBlockNum}] Bulk Writting ERC1155 transfers: ${erc1155Batch.length} histories`,
+      );
       await this.dalNFTTransferHistoryService.createERC1155NFTTransferHistoryBatch(
         erc1155Batch,
       );
+
       const allAddressKeys = R.keys(allAddress);
       const allAddressTypes = R.values(allAddress);
       const toBeInserted = R.zipWith(
@@ -458,15 +492,38 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
         allAddressKeys,
         allAddressTypes,
       );
+
+      // collections
+      this.logger.log(
+        `[${this.processingBlockNum}] Bulk Writting Collections: ${toBeInserted.length} Collections`,
+      );
       await this.nftCollectionService.insertIfNotThere(toBeInserted);
+
+      // tokens
+      this.logger.log(
+        `[${this.processingBlockNum}] Bulk Writting Tokens: ${tokens.length} Tokens`,
+      );
       await this.dalNFTTokensService.upsertTokens(tokens);
+
       const toBeInsertedTasks = R.uniqBy(
         R.props(['contractAddress', 'tokenId']),
         ownerTasks,
       );
+
+      // token owners task
+      this.logger.log(
+        `[${this.processingBlockNum}] Inserting TokenOwnerTask: ${toBeInsertedTasks.length} Tasks`,
+      );
       await this.nftTokenOwnersTaskService.upsertTasks(toBeInsertedTasks);
     } catch (e) {
       this.handleDBError(e);
+    } finally {
+      const endTimestamp = new Date().getTime() / 1000;
+      this.logger.log(
+        `[${receivedMessage.blockNum}] total processing time spent: ${
+          endTimestamp - currentTimestamp
+        } seconds`,
+      );
     }
   }
 
@@ -479,25 +536,33 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onError(error: Error, message: AWS.SQS.Message) {
-    this.logger.log(`SQS error ${error.message}`);
+    this.logger.error(
+      `[${this.processingBlockNum}] SQS error ${error.message}`,
+    );
     await this.handleError(error, message, 'SQS');
   }
 
   async onProcessingError(error: Error, message: AWS.SQS.Message) {
-    this.logger.log(`Processing error ${error.message}`);
+    this.logger.error(
+      `[${this.processingBlockNum}] Processing error ${error.message}`,
+    );
     await this.handleError(error, message, 'Processing');
   }
 
   async onTimeoutError(error: Error, message: AWS.SQS.Message) {
-    this.logger.log(`Timeout error ${error.message}`);
+    this.logger.error(
+      `[${this.processingBlockNum}] Timeout error ${error.message}`,
+    );
     await this.handleError(error, message, 'Timeout');
   }
 
-  onMessageProcessed(message: AWS.SQS.Message) {
-    this.nftBlockMonitorTaskService.removeNFTBlockMonitorTask(
+  async onMessageProcessed(message: AWS.SQS.Message) {
+    await this.nftBlockMonitorTaskService.removeNFTBlockMonitorTask(
       message.MessageId,
     );
-    this.logger.log(`Messages ${message?.MessageId} have been processed`);
+    this.logger.log(
+      `[${this.processingBlockNum}] Messages ${message?.MessageId} have been processed`,
+    );
   }
 
   private async handleError(
@@ -553,7 +618,9 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.queue.deleteMessage(deleteParams).promise();
     } catch (err) {
-      this.logger.log(`Deleting Message(${message?.MessageId}) ERROR`);
+      this.logger.log(
+        `[${this.processingBlockNum}] Deleting Message(${message?.MessageId}) ERROR`,
+      );
     }
   }
 }

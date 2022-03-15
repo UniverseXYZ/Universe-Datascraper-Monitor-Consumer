@@ -24,9 +24,6 @@ export class DalNFTTransferHistoryService {
   async createERC721NFTTransferHistoryBatch(
     transferHistory: CreateNFTTransferHistoryDto[],
   ): Promise<void> {
-    this.logger.log(
-      `Bulk write ${transferHistory.length} ERC721 transfer histories`,
-    );
     await this.nftTransferHistoryModel.bulkWrite(
       transferHistory.map((x) => ({
         updateOne: {
@@ -47,9 +44,6 @@ export class DalNFTTransferHistoryService {
   async createCryptoPunksNFTTransferHistoryBatch(
     transferHistory: CreateNFTTransferHistoryDto[],
   ): Promise<void> {
-    this.logger.log(
-      `Bulk write ${transferHistory.length} CryptoPunks transfer histories`,
-    );
     await this.nftTransferHistoryModel.bulkWrite(
       transferHistory.map((x) => ({
         updateOne: {
@@ -70,10 +64,6 @@ export class DalNFTTransferHistoryService {
   async createERC1155NFTTransferHistoryBatch(
     transferHistory: CreateNFTTransferHistoryDto[],
   ): Promise<void> {
-    this.logger.log(
-      `Bulk write ${transferHistory.length} ERC1155 transfer histories`,
-    );
-
     await this.nftTransferHistoryModel.bulkWrite(
       transferHistory.map((x) => {
         const { hash, ...rest } = x;

@@ -16,8 +16,6 @@ export class DalNFTTokenOwnerService {
   ) {}
 
   async updateERC721NFTTokenOwners(owners: CreateNFTTokenOwnerDto[]) {
-    this.logger.log(`Update ${owners.length} token owners`);
-
     await this.nftTokenOwnerModel.bulkWrite(
       owners.map((x) => ({
         updateOne: {
@@ -31,9 +29,19 @@ export class DalNFTTokenOwnerService {
     );
   }
 
-  async createERC721NFTTokenOwners(owners: CreateNFTTokenOwnerDto[]) {
-    this.logger.log(`Create ${owners.length} token owners`);
-    await this.nftTokenOwnerModel.insertMany(owners);
+  async upsertERC721NFTTokenOwners(owners: CreateNFTTokenOwnerDto[]) {
+    await this.nftTokenOwnerModel.bulkWrite(
+      owners.map((x) => ({
+        updateOne: {
+          filter: { contractAddress: x.contractAddress, tokenId: x.tokenId },
+          update: {
+            ...x,
+          },
+          upsert: true,
+        },
+      })),
+      { ordered: false },
+    );
   }
 
   async getERC721NFTTokenOwners(

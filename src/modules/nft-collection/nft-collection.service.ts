@@ -46,7 +46,6 @@ export class NFTCollectionService {
   }
 
   public async insertIfNotThere(collections: CreateNFTCollectionDto[]) {
-    console.log('insertIfNotThere', collections);
     await this.nftCollectionModel.bulkWrite(
       collections.map((collection) => ({
         updateOne: {
