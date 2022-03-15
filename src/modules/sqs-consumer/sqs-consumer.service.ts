@@ -27,7 +27,7 @@ import { NFTTokenOwnersTaskService } from '../nft-token-owners-task/nft-token-ow
 import { NFTBlockMonitorTaskService } from '../nft-block-monitor-task/nft-block-monitor-task.service';
 import { MessageStatus, NFTTokenOwner } from 'datascraper-schema';
 import { DalNFTTokenOwnerService } from '../Dal/dal-nft-token-owner/dal-nft-token-owner.service';
-import { TransferHistory } from '../ethereum/ethereum.types';
+import { BulkWriteError, TransferHistory } from '../ethereum/ethereum.types';
 
 const abiCoder = new ethers.utils.AbiCoder();
 const decodeAddress = (data: string) => {
@@ -218,6 +218,8 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     });
     const ERC721Transfer =
       '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+    const CryptoPunksPunkAssign =
+      '0x8a0e37b73a0d9c82e205d4d1a3ff3d0b57ce5f4d7bccf6bac03336dc101cb7ba';
     const CryptoPunksPunkTransfer =
       '0x05af636b70da6819000c49f85b21fa82081c632069bb626f30932034099107d8';
     const CryptoPunksPunkBought =
@@ -252,6 +254,32 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       const { address, data, topics, blockNumber, transactionHash, logIndex } =
         x;
       switch (topics[0]) {
+        case CryptoPunksPunkAssign:
+          if (R.prop(address)(allAddress) != 'CryptoPunks') {
+            break;
+          }
+          const punkIndexAssign = ethers.BigNumber.from(data).toString();
+          cryptopunkBatch.push({
+            contractAddress: address,
+            blockNum: blockNumber,
+            hash: transactionHash,
+            logIndex: logIndex,
+            from: ethers.constants.AddressZero,
+            to: decodeAddress(topics[1]),
+            tokenId: punkIndexAssign,
+            value: 1,
+            cryptopunks: {
+              punkIndex: punkIndexAssign,
+            },
+            category: 'CryptoPunks',
+          });
+          tokens.push({
+            contractAddress: address,
+            tokenType: 'CryptoPunks',
+            tokenId: punkIndexAssign,
+            source: 'MONITOR',
+          });
+          break;
         case CryptoPunksPunkTransfer:
           if (R.prop(address)(allAddress) != 'CryptoPunks') {
             break;
@@ -407,34 +435,47 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
           break;
       }
     }
-    this.logger.log('end handling logs in block: ' + nftBlockTask.blockNum);
-    await this.dalNFTTransferHistoryService.createERC721NFTTransferHistoryBatch(
-      erc721Batch,
-    );
-    await this.handleOwners(erc721Batch);
-    await this.dalNFTTransferHistoryService.createCryptoPunksNFTTransferHistoryBatch(
-      cryptopunkBatch,
-    );
-    await this.handleOwners(cryptopunkBatch);
-    await this.dalNFTTransferHistoryService.createERC1155NFTTransferHistoryBatch(
-      erc1155Batch,
-    );
-    const allAddressKeys = R.keys(allAddress);
-    const allAddressTypes = R.values(allAddress);
-    const toBeInserted = R.zipWith(
-      (a, b) => {
-        return { contractAddress: a, tokenType: b };
-      },
-      allAddressKeys,
-      allAddressTypes,
-    );
-    await this.nftCollectionService.insertIfNotThere(toBeInserted);
-    await this.dalNFTTokensService.upsertTokens(tokens);
-    const toBeInsertedTasks = R.uniqBy(
-      R.props(['contractAddress', 'tokenId']),
-      ownerTasks,
-    );
-    await this.nftTokenOwnersTaskService.upsertTasks(toBeInsertedTasks);
+
+    try {
+      this.logger.log('end handling logs in block: ' + nftBlockTask.blockNum);
+      await this.dalNFTTransferHistoryService.createERC721NFTTransferHistoryBatch(
+        erc721Batch,
+      );
+      await this.handleOwners(erc721Batch);
+      await this.dalNFTTransferHistoryService.createCryptoPunksNFTTransferHistoryBatch(
+        cryptopunkBatch,
+      );
+      await this.handleOwners(cryptopunkBatch);
+      await this.dalNFTTransferHistoryService.createERC1155NFTTransferHistoryBatch(
+        erc1155Batch,
+      );
+      const allAddressKeys = R.keys(allAddress);
+      const allAddressTypes = R.values(allAddress);
+      const toBeInserted = R.zipWith(
+        (a, b) => {
+          return { contractAddress: a, tokenType: b };
+        },
+        allAddressKeys,
+        allAddressTypes,
+      );
+      await this.nftCollectionService.insertIfNotThere(toBeInserted);
+      await this.dalNFTTokensService.upsertTokens(tokens);
+      const toBeInsertedTasks = R.uniqBy(
+        R.props(['contractAddress', 'tokenId']),
+        ownerTasks,
+      );
+      await this.nftTokenOwnersTaskService.upsertTasks(toBeInsertedTasks);
+    } catch (e) {
+      this.handleDBError(e);
+    }
+  }
+
+  handleDBError(error: Error) {
+    if (error.stack && error.stack.includes('E11000 duplicate key error')) {
+      throw new BulkWriteError(error.message, error.stack);
+    } else {
+      throw error;
+    }
   }
 
   async onError(error: Error, message: AWS.SQS.Message) {
@@ -476,19 +517,31 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       `Error type: [${type}] - ${error.stack || error.message}` ||
       `Error type: [${type}] - ${JSON.stringify(error)}`;
 
+    if (error instanceof BulkWriteError) {
+      await this.setTaskError(nftBlockTask, status, errorMessage);
+      return;
+    }
+
     // its possible for the block don't have any tx yet and we need persist it in this case and do manual check later
     if (error instanceof EmptyLogError) {
       status = MessageStatus.empty;
       errorMessage = null; // no need of error message in this case
     }
 
+    await this.setTaskError(nftBlockTask, status, errorMessage);
+    this.deleteMessage(message);
+  }
+
+  private async setTaskError(
+    nftBlockTask: any,
+    status: string,
+    errorMessage: string,
+  ) {
     await this.nftBlockMonitorTaskService.updateNFTBlockMonitorTask({
       ...nftBlockTask,
       status,
       errorMessage,
     });
-
-    this.deleteMessage(message);
   }
 
   private async deleteMessage(message: AWS.SQS.Message) {

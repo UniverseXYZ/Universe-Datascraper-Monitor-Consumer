@@ -38,3 +38,12 @@ export class SizeExceedError extends Error {
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
+
+export class BulkWriteError extends Error {
+  constructor(message: string, stack: string) {
+    super(message);
+    this.name = 'BulkWriteError';
+    this.stack = stack;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
