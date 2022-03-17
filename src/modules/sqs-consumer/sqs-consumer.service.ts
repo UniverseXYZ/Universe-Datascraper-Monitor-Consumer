@@ -583,21 +583,20 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       `Error type: [${type}] - ${JSON.stringify(error)}`;
 
     if (error instanceof BulkWriteError) {
-      await this.setTaskError(nftBlockTask, status, errorMessage);
-      return;
-    }
-
-    // its possible for the block don't have any tx yet and we need persist it in this case and do manual check later
-    if (error instanceof EmptyLogError) {
+      // retry status. In case of duplicate message, we need retry/resend message. Its better than leave this message back to queue.
+      status = MessageStatus.retry;
+      errorMessage = null; // no need of error message in this case
+    } else if (error instanceof EmptyLogError) {
+      // empty status. Its possible for the block don't have any tx yet and we need persist it in this case and do manual check later
       status = MessageStatus.empty;
       errorMessage = null; // no need of error message in this case
     }
 
-    await this.setTaskError(nftBlockTask, status, errorMessage);
+    await this.setTaskStatus(nftBlockTask, status, errorMessage);
     this.deleteMessage(message);
   }
 
-  private async setTaskError(
+  private async setTaskStatus(
     nftBlockTask: any,
     status: string,
     errorMessage: string,
