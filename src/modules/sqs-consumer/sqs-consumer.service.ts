@@ -28,6 +28,7 @@ import { NFTBlockMonitorTaskService } from '../nft-block-monitor-task/nft-block-
 import { MessageStatus, NFTTokenOwner } from 'datascraper-schema';
 import { DalNFTTokenOwnerService } from '../Dal/dal-nft-token-owner/dal-nft-token-owner.service';
 import { BulkWriteError, TransferHistory } from '../ethereum/ethereum.types';
+import { getLatestHistory, calculateOwners } from './owners.operators';
 
 const abiCoder = new ethers.utils.AbiCoder();
 const decodeAddress = (data: string) => {
@@ -112,7 +113,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     if (transferHistories.length === 0) return;
 
     this.logger.log(`[${this.processingBlockNum}] getting latest history`);
-    const latestHistory = this.getLatestHistory(transferHistories);
+    const latestHistory = getLatestHistory(transferHistories);
 
     this.logger.log(`[${this.processingBlockNum}] getting ERC721 token owners`);
     const owners = await this.nftTokenOwnerService.getERC721NFTTokenOwners(
@@ -122,7 +123,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       })),
     );
 
-    const { toBeInsertedOwners, toBeUpdatedOwners } = this.calculateOwners(
+    const { toBeInsertedOwners, toBeUpdatedOwners } = calculateOwners(
       latestHistory,
       owners,
     );
@@ -140,73 +141,6 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     await this.nftTokenOwnerService.updateERC721NFTTokenOwners(
       toBeUpdatedOwners,
     );
-  }
-
-  private calculateOwners(
-    latestHistory: TransferHistory[],
-    owners: NFTTokenOwner[],
-  ) {
-    const toBeInsertedOwners = [];
-    const toBeUpdatedOwners = [];
-
-    for (const history of latestHistory) {
-      const { tokenId, contractAddress, to, blockNum, logIndex, category } =
-        history;
-
-      const owner = owners.find(
-        (x) => x.tokenId === tokenId && x.contractAddress === contractAddress,
-      );
-
-      const newOwner = {
-        tokenId,
-        contractAddress,
-        address: to,
-        blockNum,
-        logIndex,
-        tokenType: category,
-        transactionHash: history.hash,
-        value: '1',
-      };
-
-      if (!owner) {
-        toBeInsertedOwners.push(newOwner);
-        continue;
-      }
-      if (owner.blockNum > blockNum) continue;
-
-      if (owner.blockNum === blockNum && owner.logIndex > logIndex) continue;
-
-      toBeUpdatedOwners.push(newOwner);
-    }
-
-    return { toBeInsertedOwners, toBeUpdatedOwners };
-  }
-
-  private getLatestHistory(transferHistories: TransferHistory[]) {
-    const groupedTransferHistories =
-      this.groupTransferHistoryByTokenId(transferHistories);
-
-    const latestTransferHistory = Object.keys(groupedTransferHistories).map(
-      (key) => {
-        // sort descending
-        const historiesWithTokenId = groupedTransferHistories[key].sort(
-          (a, b) => b.blockNum - a.blockNum,
-        );
-
-        return historiesWithTokenId[0];
-      },
-    );
-    return latestTransferHistory;
-  }
-
-  private groupTransferHistoryByTokenId(transferHistories: TransferHistory[]) {
-    const groupByTokenId = R.groupBy((history: TransferHistory) => {
-      return `${history.contractAddress}:${history.tokenId}`;
-    });
-
-    const grouped = groupByTokenId(transferHistories);
-
-    return grouped;
   }
 
   async handleMessage(message: AWS.SQS.Message) {

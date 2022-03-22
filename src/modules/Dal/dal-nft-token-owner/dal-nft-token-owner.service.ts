@@ -22,7 +22,8 @@ export class DalNFTTokenOwnerService {
           filter: {
             contractAddress: x.contractAddress,
             tokenId: x.tokenId,
-            blockNum: { $lt: x.blockNum },
+            blockNum: { $lte: x.blockNum },
+            logIndex: { $lt: x.logIndex },
           },
           update: {
             ...x,
@@ -37,7 +38,12 @@ export class DalNFTTokenOwnerService {
     await this.nftTokenOwnerModel.bulkWrite(
       owners.map((x) => ({
         updateOne: {
-          filter: { contractAddress: x.contractAddress, tokenId: x.tokenId },
+          filter: {
+            contractAddress: x.contractAddress,
+            tokenId: x.tokenId,
+            blockNum: { $lte: x.blockNum },
+            logIndex: { $lt: x.logIndex },
+          },
           update: {
             ...x,
           },
