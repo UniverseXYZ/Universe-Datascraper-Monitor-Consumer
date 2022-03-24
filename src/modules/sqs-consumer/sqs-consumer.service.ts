@@ -72,7 +72,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
 
   public onModuleInit() {
     this.logger.log('onModuleInit');
-    this.blacklist = this.configService.get('blacklist').split(',')
+    //this.blacklist = this.configService.get('blacklist').split(',')
 
     this.queue = new AWS.SQS({
       httpOptions: {
@@ -210,7 +210,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     for (const x of logInBlock) {
       const { address, data, topics, blockNumber, transactionHash, logIndex } =
         x;
-      if(this.blacklist.includes(address)) continue;
+      //if(this.blacklist.includes(address)) continue;
       switch (topics[0]) {
         case CryptoPunksPunkAssign:
           if (R.prop(address)(allAddress) != 'CryptoPunks') {
