@@ -22,21 +22,44 @@ export class EthereumService {
   private readonly logger = new Logger(EthereumService.name);
 
   constructor(private configService: ConfigService) {
-    const key = this.configService.get('ethereum_network');
+    const network: ethers.providers.Networkish = this.configService.get('ethereum_network');
+    const quorum: number = Number(this.configService.get('ethereum_quorum'));
 
-    const projectSecret = this.configService.get('infura.project_secret');
-    const projectId = this.configService.get('infura.project_id');
+    const projectSecret: string = this.configService.get('infura.project_secret');
+    const projectId: string = this.configService.get('infura.project_id');
+    const infuraProvider: ethers.providers.InfuraProvider = projectId && projectSecret
+      ? new ethers.providers.InfuraProvider(network, {
+          projectId: projectId,
+          projectSecret: projectSecret
+        })
+      : undefined;
+        
+    const alchemyToken: string = this.configService.get('alchemy_token')
+    const alchemyProvider: ethers.providers.AlchemyProvider = alchemyToken
+      ? new ethers.providers.AlchemyProvider(network, alchemyToken)
+      : undefined;
 
-    if (!projectSecret || !projectId) {
-      this.logger.log('Infura project id or secret is not defined');
-      throw new Error('Infura project id or secret is not defined');
+    const chainstackUrl: string = this.configService.get('chainstack_url')
+    const chainStackProvider: ethers.providers.JsonRpcProvider = chainstackUrl
+      ? new ethers.providers.JsonRpcProvider(chainstackUrl, network)
+      : undefined;
+
+    const quicknodeUrl: string = this.configService.get('quicknode_url');
+    const quicknodeProvider: ethers.providers.JsonRpcProvider = quicknodeUrl
+      ? new ethers.providers.JsonRpcProvider(quicknodeUrl, network)
+      : undefined;
+
+
+    if (!infuraProvider && !alchemyProvider && !chainStackProvider && !quicknodeProvider) {
+      throw new Error(
+        'Infura project id and secret or alchemy token or chainstack url is not defined',
+      );
     }
+    
+    const allProviders: ethers.providers.BaseProvider[] = [infuraProvider, alchemyProvider, chainStackProvider, quicknodeProvider]
+    const definedProviders: ethers.providers.BaseProvider[] = allProviders.filter(x => x !== undefined);
 
-    const ethersProvider = ethers.getDefaultProvider(EthereumNetworkType[key], {
-      infura: {
-        projectId,
-      },
-    });
+    const ethersProvider: ethers.providers.FallbackProvider = new ethers.providers.FallbackProvider(definedProviders, quorum);
     this.ether = ethersProvider;
   }
 
