@@ -7,6 +7,7 @@ export default () => ({
   alchemy_token: process.env.ALCHEMY_TOKEN,
   chainstack_url: process.env.CHAINSTACK_URL,
   quicknode_url: process.env.QUICKNODE_URL,
+  blacklist: process.env.BLACKLIST,
   ethereum_network: process.env.ETHEREUM_NETWORK,
   session_secret: process.env.SESSION_SECRET,
   infura: {
