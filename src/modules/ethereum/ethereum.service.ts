@@ -17,6 +17,9 @@ const ERC165ABI = [
 ];
 
 @Injectable()
+export class EthereumService {
+  public ether: ethers.providers.BaseProvider;
+  private readonly logger = new Logger(EthereumService.name);
   constructor(private configService: ConfigService) {
     const network: ethers.providers.Networkish = this.configService.get('ethereum_network');
 
