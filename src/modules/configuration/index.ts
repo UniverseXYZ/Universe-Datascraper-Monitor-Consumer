@@ -4,6 +4,7 @@ export default () => ({
   },
   port: process.env.APP_PORT,
   app_env: process.env.APP_ENV,
+  blacklist: process.env.BLACKLIST,
   ethereum_network: process.env.ETHEREUM_NETWORK,
   session_secret: process.env.SESSION_SECRET,
   infura: {
