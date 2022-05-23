@@ -38,7 +38,7 @@ export class DalNFTTokenOwnerService {
         { ordered: false },
       );
   
-      this.logger.log(`Batch ${i+1} completed`);
+      this.logger.log(`Batch ${i / batchSize + 1} completed`);
     }
   }
 
@@ -66,7 +66,7 @@ export class DalNFTTokenOwnerService {
         { ordered: false },
       );
     
-      this.logger.log(`Batch ${i+1} completed`);
+      this.logger.log(`Batch ${i / batchSize + 1} completed`);
     }
 
   }

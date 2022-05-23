@@ -44,7 +44,7 @@ export class DalNFTTransferHistoryService {
         { ordered: false },
       );
     
-      this.logger.log(`Batch ${i+1} completed`);
+      this.logger.log(`Batch ${i / batchSize + 1} completed`);
     }
 
   }
@@ -72,7 +72,7 @@ export class DalNFTTransferHistoryService {
         { ordered: false },
       );
       
-      this.logger.log(`Batch ${i+1} completed`);
+      this.logger.log(`Batch ${i / batchSize + 1} completed`);
     }
 
   }
@@ -103,7 +103,7 @@ export class DalNFTTransferHistoryService {
         { ordered: false },
       );
         
-      this.logger.log(`Batch ${i+1} completed`);
+      this.logger.log(`Batch ${i / batchSize + 1} completed`);
     }
   }
 }
