@@ -1,6 +1,7 @@
 export default () => ({
   mongodb: {
     uri: process.env.MONGODB_URI,
+    batchSize: process.env.BATCH_SIZE
   },
   port: process.env.APP_PORT,
   app_env: process.env.APP_ENV,

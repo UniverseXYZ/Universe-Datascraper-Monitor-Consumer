@@ -113,6 +113,8 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async handleOwners(transferHistories: TransferHistory[]) {
+    const batchSize = this.configService.get('mongodb.batchSize')
+
     if (transferHistories.length === 0) return;
 
     this.logger.log(`[${this.processingBlockNum}] getting latest history`);
@@ -136,6 +138,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     );
     await this.nftTokenOwnerService.upsertERC721NFTTokenOwners(
       toBeInsertedOwners,
+      batchSize,
     );
 
     this.logger.log(
@@ -143,6 +146,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     );
     await this.nftTokenOwnerService.updateERC721NFTTokenOwners(
       toBeUpdatedOwners,
+      batchSize,
     );
   }
 
@@ -150,6 +154,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`Consumer handle message id:(${message.MessageId})`);
     const currentTimestamp = new Date().getTime() / 1000;
     const receivedMessage = JSON.parse(message.Body) as ReceivedMessage;
+    const batchSize = this.configService.get('mongodb.batchSize')
 
     const nftBlockTask = {
       messageId: message.MessageId,
@@ -401,6 +406,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       );
       await this.dalNFTTransferHistoryService.createERC721NFTTransferHistoryBatch(
         erc721Batch,
+        batchSize
       );
       await this.handleOwners(erc721Batch);
 
@@ -410,6 +416,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       );
       await this.dalNFTTransferHistoryService.createCryptoPunksNFTTransferHistoryBatch(
         cryptopunkBatch,
+        batchSize
       );
       await this.handleOwners(cryptopunkBatch);
 
@@ -419,6 +426,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       );
       await this.dalNFTTransferHistoryService.createERC1155NFTTransferHistoryBatch(
         erc1155Batch,
+        batchSize
       );
 
       const allAddressKeys = R.keys(allAddress);
@@ -439,9 +447,9 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
 
       // tokens
       this.logger.log(
-        `[${this.processingBlockNum}] Bulk Writting Tokens: ${tokens.length} Tokens`,
+        `[${this.processingBlockNum}] Bulk Writting Tokens: ${tokens.length} Tokens | Batch size: ${batchSize}`,
       );
-      await this.dalNFTTokensService.upsertTokens(tokens);
+      await this.dalNFTTokensService.upsertTokens(tokens, batchSize);
 
       const toBeInsertedTasks = R.uniqBy(
         R.props(['contractAddress', 'tokenId']),
