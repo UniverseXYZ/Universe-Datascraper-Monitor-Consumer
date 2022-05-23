@@ -134,7 +134,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     );
 
     this.logger.log(
-      `[${this.processingBlockNum}] updating token owners, ${toBeInsertedOwners.length} owners`,
+      `[${this.processingBlockNum}] updating token owners, ${toBeInsertedOwners.length} owners | Batch size: ${batchSize}`,
     );
     await this.nftTokenOwnerService.upsertERC721NFTTokenOwners(
       toBeInsertedOwners,
@@ -142,7 +142,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     );
 
     this.logger.log(
-      `[${this.processingBlockNum}] upserting token owners, ${toBeUpdatedOwners.length} owners`,
+      `[${this.processingBlockNum}] upserting token owners, ${toBeUpdatedOwners.length} owners | Batch size: ${batchSize}`,
     );
     await this.nftTokenOwnerService.updateERC721NFTTokenOwners(
       toBeUpdatedOwners,
@@ -402,7 +402,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     try {
       // ERC721
       this.logger.log(
-        `[${this.processingBlockNum}] Bulk Writting ERC721 transfers: ${erc721Batch.length} histories`,
+        `[${this.processingBlockNum}] Bulk Writting ERC721 transfers: ${erc721Batch.length} histories | Batch size: ${batchSize}`,
       );
       await this.dalNFTTransferHistoryService.createERC721NFTTransferHistoryBatch(
         erc721Batch,
@@ -412,7 +412,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
 
       // CryptoPunks
       this.logger.log(
-        `[${this.processingBlockNum}] Bulk Writting CryptoPunks transfers: ${cryptopunkBatch.length} histories`,
+        `[${this.processingBlockNum}] Bulk Writting CryptoPunks transfers: ${cryptopunkBatch.length} histories | Batch size: ${batchSize}`,
       );
       await this.dalNFTTransferHistoryService.createCryptoPunksNFTTransferHistoryBatch(
         cryptopunkBatch,
@@ -422,7 +422,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
 
       // ERC1155
       this.logger.log(
-        `[${this.processingBlockNum}] Bulk Writting ERC1155 transfers: ${erc1155Batch.length} histories`,
+        `[${this.processingBlockNum}] Bulk Writting ERC1155 transfers: ${erc1155Batch.length} histories | Batch size: ${batchSize}`,
       );
       await this.dalNFTTransferHistoryService.createERC1155NFTTransferHistoryBatch(
         erc1155Batch,
