@@ -45,23 +45,29 @@ export class NFTCollectionService {
     );
   }
 
-  public async insertIfNotThere(collections: CreateNFTCollectionDto[]) {
-    await this.nftCollectionModel.bulkWrite(
-      collections.map((collection) => ({
-        updateOne: {
-          filter: {
-            contractAddress: collection.contractAddress,
-          },
-          update: {
-            $set: {
+  public async insertIfNotThere(collections: CreateNFTCollectionDto[], batchSize: number) {
+    for (let i = 0; i < collections.length; i += batchSize) {
+      const collectionsBatch = collections.slice(i, i + batchSize);
+
+      await this.nftCollectionModel.bulkWrite(
+        collectionsBatch.map((collection) => ({
+          updateOne: {
+            filter: {
               contractAddress: collection.contractAddress,
-              tokenType: collection.tokenType,
             },
+            update: {
+              $set: {
+                contractAddress: collection.contractAddress,
+                tokenType: collection.tokenType,
+              },
+            },
+            upsert: true,
           },
-          upsert: true,
-        },
-      })),
-      { ordered: false },
-    );
+        })),
+        { ordered: false },
+      );
+          
+      this.logger.log(`Batch ${i / batchSize + 1} completed`);
+    }
   }
 }

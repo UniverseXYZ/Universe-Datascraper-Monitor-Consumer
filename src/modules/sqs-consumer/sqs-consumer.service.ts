@@ -443,7 +443,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(
         `[${this.processingBlockNum}] Bulk Writting Collections: ${toBeInserted.length} Collections`,
       );
-      await this.nftCollectionService.insertIfNotThere(toBeInserted);
+      await this.nftCollectionService.insertIfNotThere(toBeInserted, batchSize);
 
       // tokens
       this.logger.log(
