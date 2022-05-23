@@ -113,7 +113,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async handleOwners(transferHistories: TransferHistory[]) {
-    const batchSize = this.configService.get('mongodb.batchSize')
+    const batchSize = Number(this.configService.get('mongodb.batchSize'))
 
     if (transferHistories.length === 0) return;
 
@@ -154,7 +154,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`Consumer handle message id:(${message.MessageId})`);
     const currentTimestamp = new Date().getTime() / 1000;
     const receivedMessage = JSON.parse(message.Body) as ReceivedMessage;
-    const batchSize = this.configService.get('mongodb.batchSize')
+    const batchSize = Number(this.configService.get('mongodb.batchSize'))
 
     const nftBlockTask = {
       messageId: message.MessageId,
@@ -460,7 +460,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(
         `[${this.processingBlockNum}] Inserting TokenOwnerTask: ${toBeInsertedTasks.length} Tasks`,
       );
-      await this.nftTokenOwnersTaskService.upsertTasks(toBeInsertedTasks);
+      await this.nftTokenOwnersTaskService.upsertTasks(toBeInsertedTasks, batchSize);
     } catch (e) {
       this.handleDBError(e);
     } finally {

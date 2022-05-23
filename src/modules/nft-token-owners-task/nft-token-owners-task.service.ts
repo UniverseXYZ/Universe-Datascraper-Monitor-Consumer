@@ -34,17 +34,23 @@ export class NFTTokenOwnersTaskService {
     );
   }
 
-  async upsertTasks(tasks: CreateOwnerTaskDto[]): Promise<void> {
-    await this.nftTokenOwnersTaskModel.insertMany(
-      tasks.map((x) => ({
-        contractAddress: x.contractAddress,
-        tokenId: x.tokenId,
-        priority: 10,
-        isProcessing: false,
-        tokenType: x.tokenType,
-        taskId: x.taskId,
-      })),
-      { ordered: false },
-    );
+  async upsertTasks(tasks: CreateOwnerTaskDto[], batchSize: number): Promise<void> {
+    for (let i = 0; i < tasks.length; i += batchSize) {
+      const tasksBatch = tasks.slice(i, i + batchSize);
+
+      await this.nftTokenOwnersTaskModel.insertMany(
+        tasksBatch.map((x) => ({
+          contractAddress: x.contractAddress,
+          tokenId: x.tokenId,
+          priority: 10,
+          isProcessing: false,
+          tokenType: x.tokenType,
+          taskId: x.taskId,
+        })),
+        { ordered: false },
+      );
+
+      this.logger.log(`Batch ${i / batchSize + 1} completed`);
+    }
   }
 }

@@ -28,9 +28,9 @@ export class DalNFTTokensService {
             };
           }),
           { ordered: false },
-      );
+        );
 
-      this.logger.log(`Batch ${i / batchSize + 1} completed`);
+        this.logger.log(`Batch ${i / batchSize + 1} completed`);
     }
   }
 
