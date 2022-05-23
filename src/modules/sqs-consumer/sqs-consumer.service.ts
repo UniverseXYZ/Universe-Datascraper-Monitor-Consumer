@@ -451,10 +451,16 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       );
       await this.dalNFTTokensService.upsertTokens(tokens, batchSize);
 
-      const toBeInsertedTasks = R.uniqBy(
-        R.props(['contractAddress', 'tokenId']),
-        ownerTasks,
-      );
+      const seen = Object.create(null);
+
+      const toBeInsertedTasks = ownerTasks.filter(o => {
+        var key = ['contractAddress', 'tokenId'].map(k => o[k]).join('|');
+        if (!seen[key]) {
+            seen[key] = true;
+            return true;
+        }
+      });
+
 
       // token owners task
       this.logger.log(
