@@ -12,22 +12,29 @@ export class DalNFTTokensService {
     private readonly nfttokensModel: Model<NFTTokensDocument>,
   ) {}
 
-  async upsertTokens(tokens: CreateNFTTokenDto[]): Promise<void> {
-    await this.nfttokensModel.bulkWrite(
-      tokens.map((x) => {
-        const { contractAddress, tokenId, ...rest } = x;
-        return {
-          updateOne: {
-            filter: { contractAddress: contractAddress, tokenId: tokenId },
-            update: { ...rest },
-            upsert: true,
-          },
-        };
-      }),
-      { ordered: false },
-    );
+  async upsertTokens(tokens: CreateNFTTokenDto[], batchSize: number): Promise<void> {
+    for (let i = 0; i < tokens.length; i += batchSize) {
+        const tokensBatch = tokens.slice(i, i + batchSize);
+  
+        await this.nfttokensModel.bulkWrite(
+          tokensBatch.map((x) => {
+            const { contractAddress, tokenId, ...rest } = x;
+            return {
+              updateOne: {
+                filter: { contractAddress: contractAddress, tokenId: tokenId },
+                update: { ...rest },
+                upsert: true,
+              },
+            };
+          }),
+          { ordered: false },
+      );
+
+      this.logger.log(`Batch ${i+1} completed`);
+    }
   }
 
+  // Deprecated (not used currently)
   //ERC721 is non fungible token which only has one tokenId
   async upsertERC721NFTTokens(tokens: CreateNFTTokenDto[]): Promise<void> {
     await this.nfttokensModel.bulkWrite(
@@ -48,6 +55,7 @@ export class DalNFTTokensService {
     );
   }
 
+  // Deprecated (not used currently)
   //CryptoPunks is non fungible token which only has one tokenId
   async upsertCryptoPunksNFTTokens(tokens: CreateNFTTokenDto[]): Promise<void> {
     await this.nfttokensModel.bulkWrite(
@@ -65,6 +73,7 @@ export class DalNFTTokensService {
     );
   }
 
+// Deprecated (not used currently)
   async getExistingTokensByContractAddressAndTokenId(
     tokens: CreateNFTTokenDto[],
   ): Promise<NFTToken[]> {
@@ -83,12 +92,14 @@ export class DalNFTTokensService {
     return existingTokens;
   }
 
+  // Deprecated (not used currently)
   async insertTokens(toBeInsertedTokens: CreateNFTTokenDto[]) {
     await this.nfttokensModel.insertMany(toBeInsertedTokens, {
       ordered: false,
     });
   }
 
+  // Deprecated (not used currently)
   async updateTokens(toBeUpdatedTokens: CreateNFTTokenDto[]) {
     await this.nfttokensModel.bulkWrite(
       toBeUpdatedTokens.map((x) => ({

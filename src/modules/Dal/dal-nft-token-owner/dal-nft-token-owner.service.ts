@@ -15,47 +15,60 @@ export class DalNFTTokenOwnerService {
     private readonly nftTokenOwnerModel: Model<NFTTokenOwnerDocument>,
   ) {}
 
-  async updateERC721NFTTokenOwners(owners: CreateNFTTokenOwnerDto[]) {
-    await this.nftTokenOwnerModel.bulkWrite(
-      owners.map((x) => ({
-        updateOne: {
-          filter: {
-            contractAddress: x.contractAddress,
-            tokenId: x.tokenId,
-            $or: [
-              { blockNum: { $lt: x.blockNum } },
-              { blockNum: x.blockNum, logIndex: { $lt: x.logIndex } },
-            ],
+  async updateERC721NFTTokenOwners(owners: CreateNFTTokenOwnerDto[], batchSize: number) {
+    for (let i = 0; i < owners.length; i += batchSize) {
+      const ownersBatch = owners.slice(i, i + batchSize);
+
+      await this.nftTokenOwnerModel.bulkWrite(
+        ownersBatch.map((x) => ({
+          updateOne: {
+            filter: {
+              contractAddress: x.contractAddress,
+              tokenId: x.tokenId,
+              $or: [
+                { blockNum: { $lt: x.blockNum } },
+                { blockNum: x.blockNum, logIndex: { $lt: x.logIndex } },
+              ],
+            },
+            update: {
+              ...x,
+            },
           },
-          update: {
-            ...x,
-          },
-        },
-      })),
-      { ordered: false },
-    );
+        })),
+        { ordered: false },
+      );
+  
+      this.logger.log(`Batch ${i+1} completed`);
+    }
   }
 
-  async upsertERC721NFTTokenOwners(owners: CreateNFTTokenOwnerDto[]) {
-    await this.nftTokenOwnerModel.bulkWrite(
-      owners.map((x) => ({
-        updateOne: {
-          filter: {
-            contractAddress: x.contractAddress,
-            tokenId: x.tokenId,
-            $or: [
-              { blockNum: { $lt: x.blockNum } },
-              { blockNum: x.blockNum, logIndex: { $lt: x.logIndex } },
-            ],
+  async upsertERC721NFTTokenOwners(owners: CreateNFTTokenOwnerDto[], batchSize: number) {
+    for (let i = 0; i < owners.length; i += batchSize) {
+      const ownersBatch = owners.slice(i, i + batchSize);
+
+      await this.nftTokenOwnerModel.bulkWrite(
+        ownersBatch.map((x) => ({
+          updateOne: {
+            filter: {
+              contractAddress: x.contractAddress,
+              tokenId: x.tokenId,
+              $or: [
+                { blockNum: { $lt: x.blockNum } },
+                { blockNum: x.blockNum, logIndex: { $lt: x.logIndex } },
+              ],
+            },
+            update: {
+              ...x,
+            },
+            upsert: true,
           },
-          update: {
-            ...x,
-          },
-          upsert: true,
-        },
-      })),
-      { ordered: false },
-    );
+        })),
+        { ordered: false },
+      );
+    
+      this.logger.log(`Batch ${i+1} completed`);
+    }
+
   }
 
   async getERC721NFTTokenOwners(
