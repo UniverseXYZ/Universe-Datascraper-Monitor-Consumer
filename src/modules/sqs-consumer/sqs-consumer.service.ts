@@ -42,6 +42,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
   public queue: AWS.SQS;
   private processingBlockNum: number;
   private blacklist: string[];
+  private source: string;
 
   constructor(
     private readonly configService: ConfigService,
@@ -56,12 +57,19 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     const region = this.configService.get('aws.region');
     const accessKeyId = this.configService.get('aws.accessKeyId');
     const secretAccessKey = this.configService.get('aws.secretAccessKey');
+    const source = this.configService.get('source');
 
-    if (!region || !accessKeyId || !secretAccessKey) {
+    if (!region || !accessKeyId || !secretAccessKey || !source) {
       throw new Error(
         'Initialize AWS queue failed, please check required variables',
       );
     }
+
+    if (source !== "ARCHIVE" && source !== "MONITOR") {
+      throw new Error(`SOURCE has invalid value(${source})`);
+    }
+
+    this.source = source;
 
     AWS.config.update({
       region,
@@ -240,7 +248,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
             contractAddress: address,
             tokenType: 'CryptoPunks',
             tokenId: punkIndexAssign,
-            source: 'MONITOR',
+            source: this.source,
           });
           break;
         case CryptoPunksPunkTransfer:
@@ -266,7 +274,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
             contractAddress: address,
             tokenType: 'CryptoPunks',
             tokenId: punkIndex,
-            source: 'MONITOR',
+            source: this.source,
           });
           break;
         case CryptoPunksPunkBought:
@@ -292,7 +300,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
             contractAddress: address,
             tokenType: 'CryptoPunks',
             tokenId: _punkIndex,
-            source: 'MONITOR',
+            source: this.source,
           });
           break;
         case ERC721Transfer:
@@ -318,7 +326,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
             contractAddress: address,
             tokenType: 'ERC721',
             tokenId: erc721TokenId,
-            source: 'MONITOR',
+            source: this.source,
           });
           break;
         case ERC1155TransferSingle:
@@ -346,7 +354,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
             tokenId: _id.toString(),
             value: ethers.BigNumber.from(_value).toString(),
             transactionHash: transactionHash,
-            source: 'MONITOR',
+            source: this.source,
           });
           ownerTasks.push({
             contractAddress: address,
@@ -384,7 +392,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
               tokenId: tokenId.toString(),
               value: ethers.BigNumber.from(values[index]).toString(),
               transactionHash: transactionHash,
-              source: 'MONITOR',
+              source: this.source,
             });
             ownerTasks.push({
               contractAddress: address,

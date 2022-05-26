@@ -22,4 +22,5 @@ export default () => ({
     queueUrl: process.env.AWS_QUEUE_URL,
   },
   etherscan_api_key: process.env.ETHERSCAN_API_KEY,
+  source: process.env.SOURCE
 });
