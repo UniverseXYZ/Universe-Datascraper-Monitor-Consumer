@@ -65,7 +65,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    if (source !== "ARCHIVE" && source !== "MONITOR") {
+    if (source !== 'ARCHIVE' && source !== 'MONITOR') {
       throw new Error(`SOURCE has invalid value(${source})`);
     }
 
@@ -121,7 +121,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async handleOwners(transferHistories: TransferHistory[]) {
-    const batchSize = Number(this.configService.get('mongodb.batchSize'))
+    const batchSize = Number(this.configService.get('mongodb.batchSize'));
 
     if (transferHistories.length === 0) return;
 
@@ -162,7 +162,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`Consumer handle message id:(${message.MessageId})`);
     const currentTimestamp = new Date().getTime() / 1000;
     const receivedMessage = JSON.parse(message.Body) as ReceivedMessage;
-    const batchSize = Number(this.configService.get('mongodb.batchSize'))
+    const batchSize = Number(this.configService.get('mongodb.batchSize'));
 
     const nftBlockTask = {
       messageId: message.MessageId,
@@ -414,7 +414,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       );
       await this.dalNFTTransferHistoryService.createERC721NFTTransferHistoryBatch(
         erc721Batch,
-        batchSize
+        batchSize,
       );
       await this.handleOwners(erc721Batch);
 
@@ -424,7 +424,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       );
       await this.dalNFTTransferHistoryService.createCryptoPunksNFTTransferHistoryBatch(
         cryptopunkBatch,
-        batchSize
+        batchSize,
       );
       await this.handleOwners(cryptopunkBatch);
 
@@ -434,7 +434,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       );
       await this.dalNFTTransferHistoryService.createERC1155NFTTransferHistoryBatch(
         erc1155Batch,
-        batchSize
+        batchSize,
       );
 
       const allAddressKeys = R.keys(allAddress);
@@ -451,7 +451,11 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(
         `[${this.processingBlockNum}] Bulk Writting Collections: ${toBeInserted.length} Collections`,
       );
-      await this.nftCollectionService.insertIfNotThere(toBeInserted, batchSize);
+      await this.nftCollectionService.insertIfNotThere(
+        toBeInserted,
+        batchSize,
+        this.source,
+      );
 
       // tokens
       this.logger.log(
@@ -461,20 +465,22 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
 
       const seen = Object.create(null);
 
-      const toBeInsertedTasks = ownerTasks.filter(o => {
-        var key = ['contractAddress', 'tokenId'].map(k => o[k]).join('|');
+      const toBeInsertedTasks = ownerTasks.filter((o) => {
+        var key = ['contractAddress', 'tokenId'].map((k) => o[k]).join('|');
         if (!seen[key]) {
-            seen[key] = true;
-            return true;
+          seen[key] = true;
+          return true;
         }
       });
-
 
       // token owners task
       this.logger.log(
         `[${this.processingBlockNum}] Inserting TokenOwnerTask: ${toBeInsertedTasks.length} Tasks`,
       );
-      await this.nftTokenOwnersTaskService.upsertTasks(toBeInsertedTasks, batchSize);
+      await this.nftTokenOwnersTaskService.upsertTasks(
+        toBeInsertedTasks,
+        batchSize,
+      );
     } catch (e) {
       this.handleDBError(e);
     } finally {

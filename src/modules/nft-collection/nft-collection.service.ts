@@ -23,29 +23,11 @@ export class NFTCollectionService {
     });
   }
 
-  public async markAsChecked(contractAddress: string) {
-    await this.nftCollectionModel.updateOne(
-      {
-        contractAddress,
-      },
-      {
-        firstCheckAt: new Date(),
-      },
-    );
-  }
-
-  public async markAsProcessed(contractAddress: string) {
-    await this.nftCollectionModel.updateOne(
-      {
-        contractAddress,
-      },
-      {
-        sentAt: new Date(),
-      },
-    );
-  }
-
-  public async insertIfNotThere(collections: CreateNFTCollectionDto[], batchSize: number) {
+  public async insertIfNotThere(
+    collections: CreateNFTCollectionDto[],
+    batchSize: number,
+    source: string,
+  ) {
     for (let i = 0; i < collections.length; i += batchSize) {
       const collectionsBatch = collections.slice(i, i + batchSize);
 
@@ -59,6 +41,7 @@ export class NFTCollectionService {
               $set: {
                 contractAddress: collection.contractAddress,
                 tokenType: collection.tokenType,
+                source,
               },
             },
             upsert: true,
@@ -66,7 +49,7 @@ export class NFTCollectionService {
         })),
         { ordered: false },
       );
-          
+
       this.logger.log(`Batch ${i / batchSize + 1} completed`);
     }
   }
