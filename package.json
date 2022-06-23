@@ -6,6 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "postinstall": "patch-package",
     "prebuild": "rimraf dist",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -41,6 +42,8 @@
     "helmet": "^5.0.1",
     "mongoose": "^6.1.6",
     "mongoose-unique-validator": "^3.0.0",
+    "patch-package": "^6.4.7",
+    "postinstall-postinstall": "^2.1.0",
     "ramda": "^0.28.0",
     "reflect-metadata": "^0.1.13",
     "rimraf": "^3.0.2",
