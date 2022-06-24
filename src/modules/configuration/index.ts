@@ -1,7 +1,7 @@
 export default () => ({
   mongodb: {
     uri: process.env.MONGODB_URI,
-    batchSize: process.env.BATCH_SIZE
+    batchSize: process.env.BATCH_SIZE,
   },
   port: process.env.APP_PORT,
   app_env: process.env.APP_ENV,
@@ -10,6 +10,7 @@ export default () => ({
   quicknode_url: process.env.QUICKNODE_URL,
   blacklist: process.env.BLACKLIST,
   ethereum_network: process.env.ETHEREUM_NETWORK,
+  ethereum_quorum: process.env.ETHEREUM_QUORUM,
   session_secret: process.env.SESSION_SECRET,
   infura: {
     project_id: process.env.INFURA_PROJECT_ID,
@@ -22,5 +23,5 @@ export default () => ({
     queueUrl: process.env.AWS_QUEUE_URL,
   },
   etherscan_api_key: process.env.ETHERSCAN_API_KEY,
-  source: process.env.SOURCE
+  source: process.env.SOURCE,
 });

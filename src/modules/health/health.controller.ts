@@ -10,12 +10,15 @@ export class HealthController {
   constructor(
     private health: HealthCheckService,
     private db: DbHealthService,
+    private eth: EthHealthIndicator,
   ) {}
 
   @Get()
   @HealthCheck()
   async health_check() {
-    // TODO: check health
-    return this.health.check([() => this.db.pingCheck('mongodb')]);
+    return this.health.check([
+      () => this.db.pingCheck('mongodb'),
+      () => this.eth.pingCheck('ethereum'),
+    ]);
   }
 }
