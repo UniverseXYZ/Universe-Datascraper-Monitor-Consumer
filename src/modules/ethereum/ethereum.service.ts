@@ -18,7 +18,7 @@ const ERC165ABI = [
 
 @Injectable()
 export class EthereumService {
-  public ether: ethers.providers.BaseProvider;
+  public ether: ethers.providers.FallbackProvider;
   private readonly logger = new Logger(EthereumService.name);
   constructor(private configService: ConfigService) {
     const network: ethers.providers.Networkish =
@@ -53,13 +53,14 @@ export class EthereumService {
       : undefined;
 
     if (
-      !infuraProvider &&
-      !alchemyProvider &&
-      !chainStackProvider &&
-      !quicknodeProvider
+      !quorum ||
+      (!infuraProvider &&
+        !alchemyProvider &&
+        !chainStackProvider &&
+        !quicknodeProvider)
     ) {
       throw new Error(
-        'Infura project id and secret or alchemy token or chainstack url is not defined',
+        'Quorum or Infura project id or secret or alchemy token or chainstack url is not defined',
       );
     }
 
@@ -76,6 +77,10 @@ export class EthereumService {
     const ethersProvider: ethers.providers.FallbackProvider =
       new ethers.providers.FallbackProvider(definedProviders, quorum);
     this.ether = ethersProvider;
+
+    this.logger.log(
+      `Started ethers service with ${definedProviders.length} out of ${allProviders.length} Fallback Providers. Configured quorum: ${quorum}`,
+    );
   }
 
   async getContractsInBlock(allAddress: string[], blockNum: number) {
