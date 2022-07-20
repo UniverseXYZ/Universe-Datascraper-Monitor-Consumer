@@ -29,6 +29,7 @@ import { MessageStatus, NFTTokenOwner } from 'datascraper-schema';
 import { DalNFTTokenOwnerService } from '../Dal/dal-nft-token-owner/dal-nft-token-owner.service';
 import { BulkWriteError, TransferHistory } from '../ethereum/ethereum.types';
 import { getLatestHistory, calculateOwners } from './owners.operators';
+import { CreateNFTCollectionDto } from '../nft-collection/dto/create-nft-collection.dto';
 
 const abiCoder = new ethers.utils.AbiCoder();
 const decodeAddress = (data: string) => {
@@ -159,6 +160,11 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async handleMessage(message: AWS.SQS.Message) {
+    if (!this.etherService.ether) {
+      this.logger.warn("[Monitor Consumer] Provider isn't available. Skipping this iteration. Message will be processed again after visibility timeout ends.");
+      return;
+    }
+
     this.logger.log(`Consumer handle message id:(${message.MessageId})`);
     const currentTimestamp = new Date().getTime() / 1000;
     const receivedMessage = JSON.parse(message.Body) as ReceivedMessage;
@@ -452,7 +458,7 @@ export class SqsConsumerService implements OnModuleInit, OnModuleDestroy {
         `[${this.processingBlockNum}] Bulk Writting Collections: ${toBeInserted.length} Collections`,
       );
       await this.nftCollectionService.insertIfNotThere(
-        toBeInserted,
+        toBeInserted as CreateNFTCollectionDto[],
         batchSize,
         this.source,
       );
