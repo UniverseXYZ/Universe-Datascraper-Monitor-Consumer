@@ -226,6 +226,9 @@ async function getERCtype(contract: any) {
     if (is1155) {
       return 'ERC1155';
     }
+
+    // Code should go in this case only if contract doesn't properly implement ERC721A's supportsInterface
+    return "ERC721"
   } catch (error) {
     return this.connectToProvider(() => this.getERCtype(contract));
   }
